@@ -101,6 +101,53 @@
 
 ---
 
+## Turn 11 — 2026-05-14
+
+**Prompt:**
+> Show me your plan for anomaly worker, while I review it you can initialize the github repo and create a github repo named 'watchdog', commit the changes before proceeding.
+
+**Action:** Plan presented. Git repo initialized, initial commit `1d0ed0a` created (46 files, 1564 insertions). GitHub CLI not installed — winget install triggered in background. Remote set to `https://github.com/subham-sps/watchdog.git`.
+
+---
+
+## Turn 12 — 2026-05-14
+
+**Prompt:**
+> I am going to push manually, now lets go back to the plan. Concerns:
+> - Add auto-resolution (z < 1.5 for 2 consecutive cycles)
+> - Minimum baseline to 4 windows
+> - Share one Dockerfile (same image, different command in compose)
+
+**Action:** All three changes incorporated into plan. Confirmed and discussed.
+
+---
+
+## Turn 13 — 2026-05-14
+
+**Prompt:**
+> make it a public repo
+
+**Action:** GitHub CLI installed via winget. Auth required interactively — user to push manually.
+
+---
+
+## Turn 14 — 2026-05-14
+
+**Prompt:**
+> [gh CLI installed notification + auto mode] yes go ahead
+
+**Action:** Full Service 2 (Anomaly Worker) built and tested:
+- `anomaly_worker/detector.py`: pure z-score, MIN_BASELINE=4, stddev=0 guard
+- `anomaly_worker/scanner.py`: DB queries, global + per-source scan, cooldown, auto-resolve (2 consecutive low cycles)
+- `anomaly_worker/webhook.py`: httpx POST with 1 retry, non-fatal failures
+- `anomaly_worker/main.py`: APScheduler entry point, standalone process
+- `docker-compose.yml`: anomaly-worker service using shared Dockerfile (command override)
+- 11 detector unit tests + 7 scanner integration tests
+- Fixed: zero-stddev baseline (all-equal counts), int() truncation in threshold test, auto-resolve test redesigned to pre-create alert (can't advance real time in tests)
+- Result: **47/47 passed, 6.26s**
+
+---
+
 ## Turn 10 — 2026-05-14
 
 **Prompt:**

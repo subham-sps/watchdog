@@ -17,7 +17,7 @@ services:
       timeout: 3s
       retries: 10
 
-  app:
+  api:
     build: .
     depends_on:
       db:
@@ -26,12 +26,30 @@ services:
       DATABASE_URL: postgresql+asyncpg://watchdog:watchdog@db:5432/watchdog
       BOOTSTRAP_API_KEYS: dev-key-1234
       SECRET_KEY: docker-dev-secret-key
+      WEBHOOK_URL: http://webhook-receiver:9000/hook
     ports:
       - "8000:8000"
     volumes:
       - .:/app
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  anomaly-worker:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://watchdog:watchdog@db:5432/watchdog
+      WEBHOOK_URL: http://webhook-receiver:9000/hook
+      ANOMALY_WINDOW_MINUTES: 5
+      ANOMALY_LOOKBACK_WINDOWS: 6
+      ANOMALY_ZSCORE_THRESHOLD: 3.0
+      ALERT_COOLDOWN_MINUTES: 10
+    volumes:
+      - .:/app
+    command: >
+      sh -c "alembic upgrade head && python -m anomaly_worker.main"
 
 volumes:
   pg_data:
