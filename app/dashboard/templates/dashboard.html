@@ -28,6 +28,15 @@
   </div>
 </div>
 
+<!-- Z-Score Monitor -->
+<div class="card">
+  <div class="card-header">Z-Score Monitor — live anomaly signal</div>
+  <div hx-get="/dashboard/partials/zscore"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+  </div>
+</div>
+
 <!-- Recent events -->
 <div class="card">
   <div class="card-header">Recent Events</div>

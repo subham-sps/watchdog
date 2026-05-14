@@ -197,6 +197,48 @@ async def test_webhooks_partial_fetches_server_side(client):
 
 
 @pytest.mark.asyncio
+async def test_zscore_partial_returns_html(client):
+    resp = await client.get("/dashboard/partials/zscore")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+
+
+@pytest.mark.asyncio
+async def test_zscore_partial_shows_building_with_no_data(client):
+    """No events in DB → not enough history → status=building."""
+    resp = await client.get("/dashboard/partials/zscore")
+    assert resp.status_code == 200
+    assert "BUILDING" in resp.text.upper() or "building" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_zscore_partial_shows_current_count(client, auth_headers):
+    """After ingesting events, current_count should appear in the partial."""
+    await client.post(
+        "/api/v1/events/batch",
+        json=[{"level": "error", "message": f"z-test {i}"} for i in range(5)],
+        headers=auth_headers,
+    )
+    resp = await client.get("/dashboard/partials/zscore")
+    assert resp.status_code == 200
+    assert "events" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_zscore_partial_shows_threshold(client):
+    from app.core.config import settings
+    resp = await client.get("/dashboard/partials/zscore")
+    assert str(settings.anomaly_zscore_threshold) in resp.text
+
+
+@pytest.mark.asyncio
+async def test_zscore_partial_shows_window_info(client):
+    from app.core.config import settings
+    resp = await client.get("/dashboard/partials/zscore")
+    assert str(settings.anomaly_window_minutes) in resp.text
+
+
+@pytest.mark.asyncio
 async def test_webhooks_partial_graceful_on_receiver_down(client):
     import httpx as real_httpx
 

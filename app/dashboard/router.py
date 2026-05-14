@@ -7,6 +7,7 @@ because the browser cannot resolve Docker-internal hostnames directly.
 """
 from __future__ import annotations
 
+import math
 import uuid as _uuid
 import json
 from datetime import datetime, timezone, timedelta
@@ -24,6 +25,7 @@ from app.core.database import get_db
 from app.models.event import Event
 from app.models.alert import Alert
 from app.services import alert_service, event_service
+from anomaly_worker.detector import compute_zscore
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -106,6 +108,49 @@ async def partial_trend(request: Request, db: AsyncSession = Depends(get_db)):
         "counts": counts,
         "colors": colors,
         "chart_id": str(_uuid.uuid4())[:8],     # unique id avoids canvas reuse conflicts
+    })
+
+
+@dashboard_router.get("/partials/zscore", response_class=HTMLResponse)
+async def partial_zscore(request: Request, db: AsyncSession = Depends(get_db)):
+    """Live z-score monitor: current count, baseline mean/stddev, z-score, threshold."""
+    now = datetime.now(timezone.utc)
+    lookback = settings.anomaly_lookback_windows
+
+    # Current window
+    cur_start, cur_end = _window_bounds(0, now)
+    current_count = await _event_count_for_window(db, cur_start, cur_end)
+
+    # Baseline windows (oldest → newest)
+    baseline = []
+    for i in range(1, lookback + 1):
+        start, end = _window_bounds(i, now)
+        baseline.append(await _event_count_for_window(db, start, end))
+
+    result = compute_zscore(baseline, current_count, settings.anomaly_zscore_threshold)
+
+    if result:
+        z_score = result.z_score
+        baseline_mean = result.baseline_mean
+        baseline_stddev = result.baseline_stddev
+        status = "spiking" if result.is_spike else "normal"
+    elif len([b for b in baseline if b > 0]) < 2:
+        z_score = baseline_mean = baseline_stddev = None
+        status = "building"   # not enough history yet
+    else:
+        z_score = baseline_mean = baseline_stddev = None
+        status = "flat"       # zero stddev — all baseline windows identical
+
+    return templates.TemplateResponse(request, "partials/zscore.html", {
+        "current_count": current_count,
+        "baseline_mean": baseline_mean,
+        "baseline_stddev": baseline_stddev,
+        "z_score": z_score,
+        "threshold": settings.anomaly_zscore_threshold,
+        "window_minutes": settings.anomaly_window_minutes,
+        "lookback_windows": lookback,
+        "status": status,
+        "baseline_windows": list(reversed(baseline)),   # newest first for display
     })
 
 

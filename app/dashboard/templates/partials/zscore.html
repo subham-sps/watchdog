@@ -1,0 +1,83 @@
+<div class="zscore-grid">
+
+  <!-- Current window -->
+  <div class="zscore-cell">
+    <div class="zscore-label">Current ({{ window_minutes }}m window)</div>
+    <div class="zscore-value">{{ current_count }}</div>
+    <div class="zscore-unit">events</div>
+  </div>
+
+  <!-- Baseline mean -->
+  <div class="zscore-cell">
+    <div class="zscore-label">Baseline Mean</div>
+    <div class="zscore-value">
+      {% if baseline_mean is not none %}{{ "%.1f"|format(baseline_mean) }}{% else %}—{% endif %}
+    </div>
+    <div class="zscore-unit">events / window</div>
+  </div>
+
+  <!-- Baseline stddev -->
+  <div class="zscore-cell">
+    <div class="zscore-label">Std Deviation</div>
+    <div class="zscore-value">
+      {% if baseline_stddev is not none %}{{ "%.2f"|format(baseline_stddev) }}{% else %}—{% endif %}
+    </div>
+    <div class="zscore-unit">σ</div>
+  </div>
+
+  <!-- Live z-score vs threshold -->
+  <div class="zscore-cell zscore-cell-wide">
+    <div class="zscore-label">
+      Z-Score
+      <span class="zscore-threshold-tag">threshold {{ threshold }}</span>
+    </div>
+    {% if z_score is not none %}
+      {% set pct = [(z_score / (threshold * 2)) * 100, 100] | min %}
+      {% set pct = [pct, 0] | max %}
+      <div class="zscore-bar-wrap">
+        <div class="zscore-bar-track">
+          <div class="zscore-bar-fill {% if status == 'spiking' %}zscore-bar-spike{% endif %}"
+               style="width: {{ pct }}%"></div>
+          <div class="zscore-bar-threshold" style="left: 50%"></div>
+        </div>
+        <div class="zscore-bar-labels">
+          <span>0</span>
+          <span>{{ threshold }} (threshold)</span>
+          <span>{{ threshold * 2 }}+</span>
+        </div>
+      </div>
+      <div class="zscore-score-display {% if status == 'spiking' %}zscore-spike-text{% endif %}">
+        z = {{ z_score }}
+        <span class="zscore-status-badge zscore-status-{{ status }}">{{ status | upper }}</span>
+      </div>
+    {% else %}
+      <div class="zscore-score-display">
+        <span class="zscore-status-badge zscore-status-{{ status }}">
+          {% if status == 'building' %}BUILDING BASELINE ({{ lookback_windows }} windows needed)
+          {% else %}FLAT BASELINE (zero variance)
+          {% endif %}
+        </span>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Baseline window history strip -->
+<div class="zscore-history">
+  <div class="zscore-history-label">Last {{ lookback_windows }} windows (newest → oldest)</div>
+  <div class="zscore-history-strip">
+    {% for count in baseline_windows %}
+      {% if baseline_mean %}
+        {% set deviation = ((count - baseline_mean) / baseline_stddev) if baseline_stddev else 0 %}
+        {% set intensity = [(deviation | abs) / threshold * 80 + 20, 100] | min | int %}
+      {% else %}
+        {% set intensity = 40 %}
+      {% endif %}
+      <div class="zscore-history-bar" style="height: {{ intensity }}%;"
+           title="Window -{{ loop.index }}m: {{ count }} events">
+        <span class="zscore-history-count">{{ count }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
