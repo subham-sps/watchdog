@@ -26,6 +26,8 @@ class Settings(BaseSettings):
 
     # Webhook
     webhook_url: str = "http://webhook-receiver:9000/hook"
+    webhook_type: str = "watchdog"   # watchdog | slack | generic
+    webhook_receiver_url: str = "http://webhook-receiver:9000"
 
     # Dashboard
     dashboard_refresh_seconds: int = 10

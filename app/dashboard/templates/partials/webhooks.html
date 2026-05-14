@@ -1,0 +1,29 @@
+{% if unavailable %}
+<div class="unavailable">Webhook receiver unavailable — {{ error }}</div>
+{% elif hooks %}
+<table>
+  <thead>
+    <tr>
+      <th>Received</th>
+      <th>Rule</th>
+      <th>Severity</th>
+      <th>Payload preview</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for hook in hooks %}
+    <tr>
+      <td class="ts">{{ hook.received_at[:19].replace('T', ' ') }}</td>
+      <td>{{ hook.payload.get('rule_name', hook.payload.get('title', '—')) }}</td>
+      <td>
+        {% set sev = hook.payload.get('severity', '') %}
+        {% if sev %}<span class="badge badge-{{ sev }}">{{ sev }}</span>{% else %}—{% endif %}
+      </td>
+      <td class="payload-preview">{{ hook.payload | tojson | truncate(80) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No webhooks received yet</div>
+{% endif %}

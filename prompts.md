@@ -131,12 +131,83 @@
 
 ---
 
+## Turn 22 — 2026-05-14
+
+**Prompt:**
+> show me the plan for the dashboard service please
+
+**Action:** Plan presented: Jinja2+HTMX, 5 partials, trend graph, server-side webhook fetch, Chart.js CDN.
+
+---
+
+## Turn 23 — 2026-05-14
+
+**Prompt:**
+> add a trend graph, i like to visualize. The webhook log partial needs to fetch from webhook-receiver:9000 inside the API container using httpx.
+
+**Action:** Both additions incorporated into plan.
+
+---
+
+## Turn 24 — 2026-05-14
+
+**Prompt:**
+> lets proceed
+
+**Action:** Full Service 5 (Dashboard) built — 115/115 passing, 0 warnings:
+- `config.py`: webhook_receiver_url added
+- `style.css`: dark theme, metrics grid, badges, trend wrap, table styling
+- Templates: base.html (HTMX + Chart.js CDN), dashboard.html, metrics/trend/events/alerts/webhooks partials
+- `router.py`: full page + 5 partials + ack endpoint; trend queries same windows as anomaly worker; webhooks partial fetches server-side via httpx with graceful fallback
+- `main.py`: StaticFiles mount + dashboard router
+- 15 dashboard tests covering all partials, trend data shape, server-side fetch mock, receiver-down graceful degradation
+- Fixed Starlette TemplateResponse deprecation (request as first param)
+- Result: **115/115 passed, 0 warnings, 7.80s**
+
+---
+
 ## Turn 17 — 2026-05-14
 
 **Prompt:**
 > lets send events in batches... during a spike, only one source can melt down while the others stay calm... add a burst_once flag.
 
 **Action:** Three changes incorporated into plan: batch endpoint, spike_source targeting, burst_once latch.
+
+---
+
+## Turn 19 — 2026-05-14
+
+**Prompt:**
+> show me the plan for webhook receiver now
+
+**Action:** Plan presented. Discussion led to adapter pattern question.
+
+---
+
+## Turn 20 — 2026-05-14
+
+**Prompt:**
+> if the webhook receiver was a slack or some other webhook would that be supported too?
+
+**Action:** Proposed adapter pattern: WEBHOOK_TYPE env var selects watchdog | slack | generic format. Plan updated.
+
+---
+
+## Turn 21 — 2026-05-14
+
+**Prompt:**
+> lets build it, the plan looks solid now
+
+**Action:** Full Service 4 (Webhook Receiver + Adapters) built — first run, zero failures:
+- `app/core/config.py`: webhook_type field added
+- `anomaly_worker/adapters.py`: watchdog, slack (Block Kit), generic adapters
+- `anomaly_worker/webhook.py`: picks adapter by WEBHOOK_TYPE, falls back gracefully
+- `webhook_receiver/store.py`: thread-safe deque ring buffer (maxlen=200)
+- `webhook_receiver/app.py`: POST /hook (202), GET /hooks, GET /hooks/{id}, GET /health
+- `webhook_receiver/main.py`: uvicorn entry point on port 9000
+- `docker-compose.yml`: webhook-receiver service + WEBHOOK_TYPE=watchdog on anomaly-worker
+- 15 adapter tests + 13 receiver tests (28 new)
+- Result: **100/100 passed, 4.42s**
 
 ---
 

@@ -1,0 +1,35 @@
+{% if alerts %}
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Rule</th>
+      <th>Severity</th>
+      <th>Source</th>
+      <th>Message</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for alert in alerts %}
+    <tr>
+      <td class="ts">{{ alert.created_at.strftime('%m-%d %H:%M') }}</td>
+      <td>{{ alert.rule_name }}</td>
+      <td><span class="badge badge-{{ alert.severity }}">{{ alert.severity }}</span></td>
+      <td class="ts">{{ alert.source_id or 'global' }}</td>
+      <td>{{ alert.message | truncate(60) }}</td>
+      <td>
+        <button class="btn btn-ack"
+                hx-post="/dashboard/alerts/{{ alert.id }}/acknowledge"
+                hx-target="#alerts-panel"
+                hx-swap="innerHTML">
+          Ack
+        </button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No active alerts ✓</div>
+{% endif %}

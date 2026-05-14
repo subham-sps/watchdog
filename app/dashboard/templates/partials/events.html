@@ -1,0 +1,24 @@
+{% if events %}
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Level</th>
+      <th>Source</th>
+      <th>Message</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td class="ts">{{ event.occurred_at.strftime('%m-%d %H:%M:%S') }}</td>
+      <td><span class="badge badge-{{ event.level }}">{{ event.level }}</span></td>
+      <td class="ts">{{ event.source_id or '—' }}</td>
+      <td>{{ event.message | truncate(80) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No events yet</div>
+{% endif %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Metrics bar -->
+<div class="card"
+     hx-get="/dashboard/partials/metrics"
+     hx-trigger="load, every {{ refresh_seconds }}s"
+     hx-swap="innerHTML">
+  <div class="card-body">
+    <div class="metrics-grid">
+      <div class="metric-item"><div class="metric-value">—</div><div class="metric-label">Total Events</div></div>
+      <div class="metric-item"><div class="metric-value">—</div><div class="metric-label">Last Hour</div></div>
+      <div class="metric-item"><div class="metric-value">—</div><div class="metric-label">Active Alerts</div></div>
+      <div class="metric-item"><div class="metric-value">—</div><div class="metric-label">Sources</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Trend chart -->
+<div class="card">
+  <div class="card-header">Event Rate — last {{ lookback_windows }} × {{ window_minutes }}min windows</div>
+  <div class="card-body">
+    <div class="trend-wrap"
+         hx-get="/dashboard/partials/trend"
+         hx-trigger="load, every {{ refresh_seconds }}s"
+         hx-swap="innerHTML">
+    </div>
+  </div>
+</div>
+
+<!-- Recent events -->
+<div class="card">
+  <div class="card-header">Recent Events</div>
+  <div hx-get="/dashboard/partials/events"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+  </div>
+</div>
+
+<!-- Active alerts -->
+<div class="card">
+  <div class="card-header">Active Alerts</div>
+  <div id="alerts-panel"
+       hx-get="/dashboard/partials/alerts"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+  </div>
+</div>
+
+<!-- Webhook log -->
+<div class="card">
+  <div class="card-header">Webhook Log</div>
+  <div hx-get="/dashboard/partials/webhooks"
+       hx-trigger="load, every 15s"
+       hx-swap="innerHTML">
+  </div>
+</div>
+
+{% endblock %}

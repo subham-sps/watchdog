@@ -42,6 +42,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://watchdog:watchdog@db:5432/watchdog
       WEBHOOK_URL: http://webhook-receiver:9000/hook
+      WEBHOOK_TYPE: watchdog          # switch to 'slack' or 'generic' without rebuild
       ANOMALY_WINDOW_MINUTES: 5
       ANOMALY_LOOKBACK_WINDOWS: 6
       ANOMALY_ZSCORE_THRESHOLD: 3.0
@@ -50,6 +51,14 @@ services:
       - .:/app
     command: >
       sh -c "alembic upgrade head && python -m anomaly_worker.main"
+
+  webhook-receiver:
+    build: .
+    ports:
+      - "9000:9000"
+    volumes:
+      - .:/app
+    command: uvicorn webhook_receiver.app:app --host 0.0.0.0 --port 9000 --reload
 
   log-generator:
     build: .
