@@ -2,10 +2,11 @@
 Generator — builds event batches and POSTs them to the Watchdog API.
 
 One tick = TICK_SECONDS seconds. Per tick the generator:
-  1. Determines which sources are bursting (respects spike_source + burst_once).
-  2. For each source, computes how many events to emit this tick.
-  3. Builds a batch payload and fires ONE POST /api/v1/events/batch.
-  4. Logs outcome; never raises on API errors.
+  1. Ensures sources are registered (lazy, once per source, cached).
+  2. Determines which sources are bursting (respects spike_source + burst_once).
+  3. For each source, computes how many events to emit this tick.
+  4. Builds a batch payload with resolved source_id and fires ONE POST.
+  5. Logs outcome; never raises on API errors.
 """
 from __future__ import annotations
 
@@ -28,9 +29,51 @@ class GeneratorState:
     api_url: str
     api_key: str
     tick_seconds: int = 5
-    _source_index: int = 0
-    _burst_fired: bool = False       # latch for burst_once profiles
+    _burst_fired: bool = False
     _started_at: float = field(default_factory=time.monotonic)
+    _source_ids: dict[str, str | None] = field(default_factory=dict)  # name → uuid str
+
+    # ------------------------------------------------------------------
+    # Source registration
+    # ------------------------------------------------------------------
+
+    async def _ensure_sources_registered(self, client: httpx.AsyncClient) -> None:
+        """Register any sources not yet in the cache. Idempotent — 409 = already exists."""
+        headers = {"X-API-Key": self.api_key, "Content-Type": "application/json"}
+        for name in self.profile.source_names:
+            if name in self._source_ids:
+                continue
+            try:
+                resp = await client.post(
+                    f"{self.api_url}/api/v1/sources",
+                    json={"name": name, "description": f"Auto-registered by log-generator ({self.profile.name} profile)"},
+                    headers=headers,
+                )
+                if resp.status_code == 201:
+                    self._source_ids[name] = resp.json()["id"]
+                    logger.info("Registered source '%s' → %s", name, self._source_ids[name])
+                elif resp.status_code == 409:
+                    # Already exists — fetch to get its id
+                    list_resp = await client.get(
+                        f"{self.api_url}/api/v1/sources",
+                        headers={"X-API-Key": self.api_key},
+                    )
+                    if list_resp.status_code == 200:
+                        sources = list_resp.json()
+                        match = next((s for s in sources if s["name"] == name), None)
+                        if match:
+                            self._source_ids[name] = match["id"]
+                            logger.info("Resolved existing source '%s' → %s", name, self._source_ids[name])
+                else:
+                    logger.warning("Failed to register source '%s': %s", name, resp.status_code)
+                    self._source_ids[name] = None  # proceed without source_id this tick
+            except httpx.RequestError as exc:
+                logger.warning("Could not register source '%s': %s — will retry next tick", name, exc)
+                # Do NOT cache None on network errors so the next tick retries
+
+    # ------------------------------------------------------------------
+    # Burst / timing logic
+    # ------------------------------------------------------------------
 
     def _elapsed_seconds(self) -> float:
         return time.monotonic() - self._started_at
@@ -65,12 +108,10 @@ class GeneratorState:
         if not bursting:
             count = base_per_tick
         elif p.spike_source is not None and source != p.spike_source:
-            # Only the spike_source gets the burst; others stay calm
             count = base_per_tick
         else:
             count = base_per_tick * p.burst_multiplier
 
-        # Stochastic rounding: e.g. 2.3 → 2 with 70% chance, 3 with 30%
         floored = int(count)
         remainder = count - floored
         return floored + (1 if random.random() < remainder else 0)
@@ -81,23 +122,28 @@ class GeneratorState:
 
         for source in self.profile.source_names:
             n = self._events_for_source(source, bursting)
+            source_id = self._source_ids.get(source)   # None until registered
             for _ in range(n):
                 batch.append({
                     "level": self._pick_level(),
                     "message": f"[{source}] synthetic log event",
-                    "source_id": None,   # API resolves source by name via payload tag
+                    "source_id": source_id,
                     "payload": {"source_name": source, "profile": self.profile.name},
                 })
 
         return batch
 
-    async def tick(self) -> None:
-        batch = self.build_batch()
-        if not batch:
-            return
+    # ------------------------------------------------------------------
+    # Main tick
+    # ------------------------------------------------------------------
 
+    async def tick(self) -> None:
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+                await self._ensure_sources_registered(client)
+                batch = self.build_batch()
+                if not batch:
+                    return
                 resp = await client.post(
                     f"{self.api_url}/api/v1/events/batch",
                     json=batch,

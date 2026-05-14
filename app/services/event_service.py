@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
 from app.models.event import Event
 from app.schemas.event import EventCreate
 
@@ -61,6 +62,7 @@ async def list_events(
 
     stmt = (
         select(Event)
+        .options(selectinload(Event.source))
         .where(and_(*filters) if filters else True)
         .order_by(Event.occurred_at.desc())
         .limit(limit)

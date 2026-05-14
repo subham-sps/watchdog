@@ -191,25 +191,36 @@ async def test_tick_posts_batch_to_api():
     state = GeneratorState(
         profile=NORMAL, api_url="http://watchdog:8000", api_key="test-key", tick_seconds=60
     )
-    mock_resp = MagicMock()
-    mock_resp.status_code = 201
+
+    source_resp = MagicMock()
+    source_resp.status_code = 201
+    source_resp.json.return_value = {"id": "aaaaaaaa-0000-0000-0000-000000000001"}
+
+    batch_resp = MagicMock()
+    batch_resp.status_code = 201
+
+    # First N calls are source registrations (one per source_name), last is the batch POST
+    n_sources = len(NORMAL.source_names)
+    side_effects = [source_resp] * n_sources + [batch_resp]
 
     with patch("log_generator.generator.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client.post = AsyncMock(side_effect=side_effects)
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client_cls.return_value = mock_client
 
         await state.tick()
 
-    mock_client.post.assert_called_once()
-    call_kwargs = mock_client.post.call_args
-    assert "/api/v1/events/batch" in call_kwargs[0][0]
-    assert call_kwargs[1]["headers"]["X-API-Key"] == "test-key"
-    sent_batch = call_kwargs[1]["json"]
+    # Last call must be the batch endpoint
+    last_call = mock_client.post.call_args_list[-1]
+    assert "/api/v1/events/batch" in last_call[0][0]
+    assert last_call[1]["headers"]["X-API-Key"] == "test-key"
+    sent_batch = last_call[1]["json"]
     assert isinstance(sent_batch, list)
     assert len(sent_batch) > 0
+    # All events should now have a resolved source_id
+    assert all(e["source_id"] is not None for e in sent_batch)
 
 
 @pytest.mark.asyncio
@@ -246,5 +257,8 @@ async def test_tick_survives_connection_error():
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client_cls.return_value = mock_client
 
-        # Should not raise
+        # Should not raise — connection errors are logged and retried next tick
         await state.tick()
+
+    # Source IDs should NOT be cached as None on connection error — retry next tick
+    assert len(state._source_ids) == 0

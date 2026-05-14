@@ -13,7 +13,7 @@
     <tr>
       <td class="ts">{{ event.occurred_at.strftime('%m-%d %H:%M:%S') }}</td>
       <td><span class="badge badge-{{ event.level }}">{{ event.level }}</span></td>
-      <td class="ts">{{ event.source_id or '—' }}</td>
+      <td class="ts">{{ event.source.name if event.source else '—' }}</td>
       <td>{{ event.message | truncate(80) }}</td>
     </tr>
     {% endfor %}
