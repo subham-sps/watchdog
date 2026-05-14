@@ -154,7 +154,45 @@
 **Prompt:**
 > lets proceed
 
-**Action:** Full Service 5 (Dashboard) built — 115/115 passing, 0 warnings:
+**Action:** Full Service 5 (Dashboard) built — see Turn 24 entry for detail.
+
+---
+
+## Turn 25 — 2026-05-14
+
+**Prompt:** lets start the complete stack and test it now
+
+**Action:** Full stack started via docker-compose. All 5 containers healthy. Smoke tests passed across all endpoints. Dashboard confirmed live at localhost:8000/dashboard.
+
+---
+
+## Turn 26 — 2026-05-14
+
+**Prompt:** in the dashboard i see that the source is not getting populated
+
+**Action:** Fixed three issues: generator was sending source_id=null (never wired up source registration), dashboard showed raw UUID not name, network errors incorrectly cached as null blocking retries. Added source registration at startup, selectinload on list_events, template uses event.source.name.
+
+---
+
+## Turn 27 — 2026-05-14
+
+**Prompt:** i dont see any alerts, its been 15mins almost
+
+**Action:** Root cause: ANOMALY_WINDOW_MINUTES=5 + LOOKBACK=6 required 35 min of history. Burst profile fires every 3 min inside the 6-min baseline so mean is always elevated. Fixed: window=1m, threshold=2.5, cooldown=3m. Manually injected 800 events → alert fired (z=13.43, current=839, mean=102.5). Full alert+webhook chain confirmed.
+
+---
+
+## Turn 28–32 — 2026-05-14
+
+**Prompts:** Baseline/burst traffic analysis → PROFILE=normal → 10-window revert → threshold=1.8, cooldown=1m, PROFILE=burst for frequent alerts. Z-Score Monitor panel added to dashboard showing current count, baseline mean, stddev, live z-score bar, threshold marker, history strip. 120/120 tests passing.
+
+---
+
+## Turn 33 — 2026-05-14
+
+**Prompt:** update the readme.md with more information regarding how the application works, its architecture diagram and the flow for the end user on how to interact with the app
+
+**Action:** README completely rewritten with: how-it-works narrative, ASCII architecture diagram, full data flow diagram, stack table, quick start guide, complete API reference with curl examples, dashboard panel descriptions, all configuration variables, profile comparison table, webhook adapter guide, test instructions, and full project structure. — 115/115 passing, 0 warnings:
 - `config.py`: webhook_receiver_url added
 - `style.css`: dark theme, metrics grid, badges, trend wrap, table styling
 - Templates: base.html (HTMX + Chart.js CDN), dashboard.html, metrics/trend/events/alerts/webhooks partials
