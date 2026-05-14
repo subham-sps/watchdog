@@ -22,6 +22,24 @@ async def ingest(db: AsyncSession, data: EventCreate) -> Event:
     return event
 
 
+async def ingest_batch(db: AsyncSession, items: list[EventCreate]) -> list[Event]:
+    now = datetime.now(timezone.utc)
+    events = [
+        Event(
+            source_id=item.source_id,
+            level=item.level,
+            message=item.message,
+            payload=item.payload,
+            fingerprint=item.fingerprint,
+            occurred_at=item.occurred_at or now,
+        )
+        for item in items
+    ]
+    db.add_all(events)
+    await db.flush()
+    return events
+
+
 async def list_events(
     db: AsyncSession,
     source_id: Optional[uuid.UUID] = None,

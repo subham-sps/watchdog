@@ -5,15 +5,26 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import require_api_key
+from fastapi import Body
 from app.schemas.event import EventCreate, EventRead
 from app.services import event_service
 
 router = APIRouter()
 
+_MAX_BATCH = 500
+
 
 @router.post("/events", response_model=EventRead, status_code=201, dependencies=[Depends(require_api_key)])
 async def ingest_event(data: EventCreate, db: AsyncSession = Depends(get_db)):
     return await event_service.ingest(db, data)
+
+
+@router.post("/events/batch", response_model=list[EventRead], status_code=201, dependencies=[Depends(require_api_key)])
+async def ingest_events_batch(
+    data: list[EventCreate] = Body(..., min_length=1, max_length=_MAX_BATCH),
+    db: AsyncSession = Depends(get_db),
+):
+    return await event_service.ingest_batch(db, data)
 
 
 @router.get("/events", response_model=list[EventRead], dependencies=[Depends(require_api_key)])

@@ -51,5 +51,19 @@ services:
     command: >
       sh -c "alembic upgrade head && python -m anomaly_worker.main"
 
+  log-generator:
+    build: .
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      WATCHDOG_API_URL: http://api:8000
+      WATCHDOG_API_KEY: dev-key-1234
+      PROFILE: burst
+      TICK_SECONDS: 5
+    volumes:
+      - .:/app
+    command: python -m log_generator.main
+
 volumes:
   pg_data:

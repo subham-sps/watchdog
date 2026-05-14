@@ -122,6 +122,40 @@
 
 ---
 
+## Turn 16 — 2026-05-14
+
+**Prompt:**
+> show me the plan for log generator now
+
+**Action:** Plan presented with full file list, profile schema, generator logic, docker-compose addition, and 9 planned tests.
+
+---
+
+## Turn 17 — 2026-05-14
+
+**Prompt:**
+> lets send events in batches... during a spike, only one source can melt down while the others stay calm... add a burst_once flag.
+
+**Action:** Three changes incorporated into plan: batch endpoint, spike_source targeting, burst_once latch.
+
+---
+
+## Turn 18 — 2026-05-14
+
+**Prompt:**
+> yes..the plan looks good now..lets cook
+
+**Action:** Full Service 3 (Log Generator) built and tested — first run, zero failures:
+- `POST /api/v1/events/batch` endpoint + `ingest_batch` service method (6 new API tests)
+- `log_generator/profiles.py`: Profile dataclass with spike_source, burst_once, validation
+- `log_generator/generator.py`: batch collection, stochastic rounding, targeted source, burst_once latch
+- `log_generator/main.py`: asyncio entry point, PROFILE env var
+- `docker-compose.yml`: log-generator service (shared image, command override)
+- 20 unit tests (no DB, httpx mocked)
+- Result: **72/72 passed, 4.11s**
+
+---
+
 ## Turn 13 — 2026-05-14
 
 **Prompt:**

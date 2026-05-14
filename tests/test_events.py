@@ -109,3 +109,65 @@ async def test_list_events_pagination(client, auth_headers):
     ids_p1 = {e["id"] for e in page1.json()}
     ids_p2 = {e["id"] for e in page2.json()}
     assert ids_p1.isdisjoint(ids_p2)
+
+
+# ---------------------------------------------------------------------------
+# Batch ingest
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_batch_ingest_events(client, auth_headers):
+    payload = [
+        {"level": "info", "message": "batch-1"},
+        {"level": "warning", "message": "batch-2"},
+        {"level": "error", "message": "batch-3"},
+    ]
+    resp = await client.post("/api/v1/events/batch", json=payload, headers=auth_headers)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert len(data) == 3
+    levels = {e["level"] for e in data}
+    assert levels == {"info", "warning", "error"}
+
+
+@pytest.mark.asyncio
+async def test_batch_ingest_all_appear_in_list(client, auth_headers):
+    payload = [{"level": "debug", "message": f"bulk-{i}"} for i in range(10)]
+    await client.post("/api/v1/events/batch", json=payload, headers=auth_headers)
+    resp = await client.get("/api/v1/events?level=debug&limit=20", headers=auth_headers)
+    assert resp.status_code == 200
+    assert len(resp.json()) >= 10
+
+
+@pytest.mark.asyncio
+async def test_batch_empty_list_rejected(client, auth_headers):
+    resp = await client.post("/api/v1/events/batch", json=[], headers=auth_headers)
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_batch_invalid_level_rejected(client, auth_headers):
+    payload = [
+        {"level": "info", "message": "ok"},
+        {"level": "INVALID", "message": "bad level"},
+    ]
+    resp = await client.post("/api/v1/events/batch", json=payload, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_batch_requires_auth(client):
+    payload = [{"level": "info", "message": "no key"}]
+    resp = await client.post("/api/v1/events/batch", json=payload)
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_batch_single_item_accepted(client, auth_headers):
+    resp = await client.post(
+        "/api/v1/events/batch",
+        json=[{"level": "critical", "message": "solo batch"}],
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    assert len(resp.json()) == 1
